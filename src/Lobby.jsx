@@ -2,7 +2,7 @@ import React from "react";
 import {io} from "socket.io-client";
 import Cookies from "js-cookie";
 import { v4 as uuidv4 } from 'uuid';
-
+import {ZegoUIKitPrebuilt} from "@zegocloud/zego-uikit-prebuilt"
 function Lobby(){
     var timebtwn=3;
     const [word,setword]=React.useState("");
@@ -27,6 +27,25 @@ function Lobby(){
         const value=event.target.value;
         setMessage(value);
     }
+    const myMeeting=async (element)=>{
+        const appID=process.env.appID;
+        const serverSecret=process.env.serverSecret;
+        let room=Cookies.get("roomid");
+        let user=Cookies.get("userid");
+        const kitToken=ZegoUIKitPrebuilt.generateKitTokenForTest(appID,serverSecret,room,user,"Enter name");
+        const zp=ZegoUIKitPrebuilt.create(kitToken);
+        zp.joinRoom({
+            container:element,
+            scenario:{
+                mode:ZegoUIKitPrebuilt.InvitationTypeVoiceCall
+            },
+            showCameraToggleButton: false,  // Hide the camera toggle button to focus on audio
+            showMicrophoneToggleButton: false,  // Show the microphone toggle button
+            showUserList: false,  // Show the user list
+            layout: 'audio'  // Ensure the layout is optimized for audio
+        })
+    }
+   
     function startGame() {
         console.log(admin);
         if(admin==0){
@@ -310,6 +329,7 @@ function Lobby(){
         </div>
             {/* {console.log(admin)} */}
             {admin!=0?<button onClick={startGame}>Start</button>:null}
+            <div ref={myMeeting}></div>
         </div>
     )
 }
