@@ -1,9 +1,9 @@
 import React from "react";
 import {io} from "socket.io-client";
 import Cookies from "js-cookie";
-import { v4 as uuidv4 } from 'uuid';
-import {ZegoUIKitPrebuilt} from "@zegocloud/zego-uikit-prebuilt"
+import { useNavigate,Navigate } from "react-router-dom";
 function Lobby(){
+    const navigate = useNavigate();
     var timebtwn=3;
     const [word,setword]=React.useState("");
     const ref=React.useRef();
@@ -16,6 +16,7 @@ function Lobby(){
         setPenColor("#FFFFFF");
         contextref.current.strokeStyle = "#FFFFFF";
     }
+    const [allusers,setAllusers]=React.useState([]);
     const [name,setname]=React.useState("");
     const socket=React.useMemo(()=>io("http://localhost:4000",{withCredentials:true}),[]);
     const [message,setMessage]=React.useState("");
@@ -27,24 +28,29 @@ function Lobby(){
         const value=event.target.value;
         setMessage(value);
     }
-    const myMeeting=async (element)=>{
-        const appID=process.env.appID;
-        const serverSecret=process.env.serverSecret;
-        let room=Cookies.get("roomid");
-        let user=Cookies.get("userid");
-        const kitToken=ZegoUIKitPrebuilt.generateKitTokenForTest(appID,serverSecret,room,user,"Enter name");
-        const zp=ZegoUIKitPrebuilt.create(kitToken);
-        zp.joinRoom({
-            container:element,
-            scenario:{
-                mode:ZegoUIKitPrebuilt.InvitationTypeVoiceCall
-            },
-            showCameraToggleButton: false,  // Hide the camera toggle button to focus on audio
-            showMicrophoneToggleButton: false,  // Show the microphone toggle button
-            showUserList: false,  // Show the user list
-            layout: 'audio'  // Ensure the layout is optimized for audio
-        })
-    }
+    // const myMeeting=async (element)=>{
+    //     const appID="";
+    //     const serverSecret="";
+    //     let room=Cookies.get("roomid");
+    //     let user=Cookies.get("userid");
+    //     const kitToken=ZegoUIKitPrebuilt.generateKitTokenForTest(appID,serverSecret,room,user,"Enter name");
+    //     const zp=ZegoUIKitPrebuilt.create(kitToken);
+    //     zp.joinRoom({
+    //         container:element,
+    //         scenario:{
+    //             mode:ZegoUIKitPrebuilt.InvitationTypeVoiceCall
+    //         },
+    //         lowerLeftNotification:{
+    //             showUserJoinAndLeave: false,// Hide the user joining/leaving notification on the lower left.
+    //             showTextChat: false,// Hide the text chat on the lower left.
+    //         },
+    //         turnOnCameraWhenJoining: false,
+    //         showMyCameraToggleButton: false,
+    //         showAudioVideoSettingsButton: false,
+    //         showScreenSharingButton: false ,
+    //         showPreJoinView: false
+    //     })
+    // }
    
     function startGame() {
         console.log(admin);
@@ -68,7 +74,7 @@ function Lobby(){
     // //     });
     // //   }, []);
     React.useEffect(()=>{
-       
+        
         setTimer(timebtwn);
         let a=Cookies.get("admin");
         setAdmin(a);
@@ -199,7 +205,12 @@ function Lobby(){
             console.log("corrected guess by ",user);
             socket.emit("check-time",user);
         })
-        
+
+        socket.on("allusers",(arr)=>{
+            console.log("alluseres",arr);
+            setAllusers(arr);
+        })
+
     },[]);
     function sendMessage(event){
 
@@ -289,6 +300,15 @@ function Lobby(){
         <div>
             <div className="left_lobby">
                 <h3>word is {word}</h3>
+                {allusers.map((user)=>{
+                    return(
+                    <div>
+                        
+                        <p>user is {user.user} score is  {user.score}</p>
+                        
+                    </div>
+                    );
+                })}
                 <h3>Round number {round}</h3>
                 <h3>player {playername} is playing </h3>
             <p>{Cookies.get("userid")} {timer}</p>
@@ -329,7 +349,7 @@ function Lobby(){
         </div>
             {/* {console.log(admin)} */}
             {admin!=0?<button onClick={startGame}>Start</button>:null}
-            <div ref={myMeeting}></div>
+            {/* <div ref={myMeeting} style={{height:"10px",width:"10px"}}></div> */}
         </div>
     )
 }
