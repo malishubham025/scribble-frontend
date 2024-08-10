@@ -71,19 +71,16 @@ function Lobby(){
     // //     });
     // //   }, []);
     React.useEffect(()=>{
-        let c=Cookies.get("userid");
         let set=new Set();
         let peerId = null; 
         let remote=document.querySelector(".videos");
-        function addVideo(stream,user) {
+        function addVideo(stream) {
             // Check if the stream is already in the Set
             if (!set.has(stream)) {
               set.add(stream);
           
               // Create a new video element for the new stream
               let video = document.createElement("video");
-            
-              video.classList.add(user);
               video.srcObject = stream;
               video.autoplay = true;
               remote.appendChild(video);
@@ -96,7 +93,7 @@ function Lobby(){
         navigator.mediaDevices.getUserMedia({ audio: true, video: true })
         .then((stream) => {
           localstream.current=stream;
-          addVideo(stream,Cookies.get("userid"));
+          addVideo(stream);
         })
         .catch(err => console.error('Failed to get local stream', err));
       
@@ -111,7 +108,7 @@ function Lobby(){
                 socket.emit("join-room",{room,user});
                 peer.on('open',function(id){
                     peerId = id; 
-                    socket.emit("joinedroom",room,id,user);
+                    socket.emit("joinedroom",room,id);
                 })
                 
             }
@@ -123,15 +120,15 @@ function Lobby(){
             });
           }
           
-          socket.on("userjoined",  (id,user) => {
-            console.log("dnkkjkjddj",user);
+          socket.on("userjoined",  (id) => {
+            
             let call =  peerinstance.current.call(id, localstream.current);
             // console.log(call);
             if(call){
                 console.log("hi");
-                call.on("stream", (remoteStream) => {
+                            call.on("stream", (remoteStream) => {
                 console.log("called");
-              addVideo(remoteStream,user);
+              addVideo(remoteStream);
             });
             }
 
@@ -267,9 +264,9 @@ function Lobby(){
         //     socket.emit("peer-closed",room,peerId);
         //     // console.log("Peer connection closed.",peerId);
         // })
-        socket.on("user-disconnect",(id)=>{
-            console.log("peer closed",id);
-        })
+        // socket.on("peer-close",(id)=>{
+        //     console.log("peer closed",id);
+        // })
     },[]);
     let mutebtn=document.querySelector("#mutebtn");
     function handleMute(){
