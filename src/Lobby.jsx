@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useRef } from "react";
 import {io} from "socket.io-client";
 import Cookies from "js-cookie";
-import { useNavigate,Navigate } from "react-router-dom";
+import { v4 as uuidv4 } from 'uuid';
+import Peer from "peerjs";
+// import {ZegoUIKitPrebuilt} from "@zegocloud/zego-uikit-prebuilt"
 function Lobby(){
-    const navigate = useNavigate();
     var timebtwn=3;
     const [word,setword]=React.useState("");
     const ref=React.useRef();
@@ -12,11 +13,12 @@ function Lobby(){
     const [penColor, setPenColor] = React.useState("#000000"); 
     const [penWidth, setPenWidth] = React.useState(1);
     const [admin,setAdmin]=React.useState(0);
+    const localstream=useRef(null);
+    const peerinstance=useRef(null);
     function click(){
         setPenColor("#FFFFFF");
         contextref.current.strokeStyle = "#FFFFFF";
     }
-    const [allusers,setAllusers]=React.useState([]);
     const [name,setname]=React.useState("");
     const socket=React.useMemo(()=>io("http://localhost:4000",{withCredentials:true}),[]);
     const [message,setMessage]=React.useState("");
@@ -28,29 +30,24 @@ function Lobby(){
         const value=event.target.value;
         setMessage(value);
     }
-    // const myMeeting=async (element)=>{
-    //     const appID="";
-    //     const serverSecret="";
-    //     let room=Cookies.get("roomid");
-    //     let user=Cookies.get("userid");
-    //     const kitToken=ZegoUIKitPrebuilt.generateKitTokenForTest(appID,serverSecret,room,user,"Enter name");
-    //     const zp=ZegoUIKitPrebuilt.create(kitToken);
-    //     zp.joinRoom({
-    //         container:element,
-    //         scenario:{
-    //             mode:ZegoUIKitPrebuilt.InvitationTypeVoiceCall
-    //         },
-    //         lowerLeftNotification:{
-    //             showUserJoinAndLeave: false,// Hide the user joining/leaving notification on the lower left.
-    //             showTextChat: false,// Hide the text chat on the lower left.
-    //         },
-    //         turnOnCameraWhenJoining: false,
-    //         showMyCameraToggleButton: false,
-    //         showAudioVideoSettingsButton: false,
-    //         showScreenSharingButton: false ,
-    //         showPreJoinView: false
-    //     })
-    // }
+    const myMeeting=async (element)=>{
+        const appID=process.env.appID;
+        const serverSecret=process.env.serverSecret;
+        let room=Cookies.get("roomid");
+        let user=Cookies.get("userid");
+        // const kitToken=ZegoUIKitPrebuilt.generateKitTokenForTest(appID,serverSecret,room,user,"Enter name");
+        // const zp=ZegoUIKitPrebuilt.create(kitToken);
+        // zp.joinRoom({
+        //     container:element,
+        //     scenario:{
+        //         mode:ZegoUIKitPrebuilt.InvitationTypeVoiceCall
+        //     },
+        //     showCameraToggleButton: false,  // Hide the camera toggle button to focus on audio
+        //     showMicrophoneToggleButton: false,  // Show the microphone toggle button
+        //     showUserList: false,  // Show the user list
+        //     layout: 'audio'  // Ensure the layout is optimized for audio
+        // })
+    }
    
     function startGame() {
         console.log(admin);
@@ -74,16 +71,73 @@ function Lobby(){
     // //     });
     // //   }, []);
     React.useEffect(()=>{
-        
+        let c=Cookies.get("userid");
+        let set=new Set();
+        let peerId = null; 
+        let remote=document.querySelector(".videos");
+        function addVideo(stream,user) {
+            // Check if the stream is already in the Set
+            if (!set.has(stream)) {
+              set.add(stream);
+          
+              // Create a new video element for the new stream
+              let video = document.createElement("video");
+            
+              video.classList.add(user);
+              video.srcObject = stream;
+              video.autoplay = true;
+              remote.appendChild(video);
+              console.log(remote);
+            }
+          }
+          
+        const peer=new Peer();
+        peerinstance.current=peer;
+        navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+        .then((stream) => {
+          localstream.current=stream;
+          addVideo(stream,Cookies.get("userid"));
+        })
+        .catch(err => console.error('Failed to get local stream', err));
+      
         setTimer(timebtwn);
         let a=Cookies.get("admin");
         setAdmin(a);
         const room=Cookies.get("roomid");
         const user=Cookies.get("userid");
-        if(room){
-            
-            socket.emit("join-room",{room,user});
-        }
+
+        if (peer) {
+            if(room){
+                socket.emit("join-room",{room,user});
+                peer.on('open',function(id){
+                    peerId = id; 
+                    socket.emit("joinedroom",room,id,user);
+                })
+                
+            }
+            peer.on("call", async (call) => {
+              call.answer(localstream.current); // Ensure localstream is available here
+              call.on("stream", (remoteStream) => {
+                addVideo(remoteStream);
+              });
+            });
+          }
+          
+          socket.on("userjoined",  (id,user) => {
+            console.log("dnkkjkjddj",user);
+            let call =  peerinstance.current.call(id, localstream.current);
+            // console.log(call);
+            if(call){
+                console.log("hi");
+                call.on("stream", (remoteStream) => {
+                console.log("called");
+              addVideo(remoteStream,user);
+            });
+            }
+
+            console.log("user joined", id);
+          });
+          
         // io.on("game-started",(obj)=>{
             
         // })
@@ -205,13 +259,32 @@ function Lobby(){
             console.log("corrected guess by ",user);
             socket.emit("check-time",user);
         })
-
-        socket.on("allusers",(arr)=>{
-            console.log("alluseres",arr);
-            setAllusers(arr);
+        socket.on("reload",(room)=>{
+            socket.emit("new_user",room);
         })
-
+        // peer.on("close",()=>{
+        //     let room=Cookies.get("roomid");
+        //     socket.emit("peer-closed",room,peerId);
+        //     // console.log("Peer connection closed.",peerId);
+        // })
+        socket.on("user-disconnect",(id)=>{
+            console.log("peer closed",id);
+        })
     },[]);
+    let mutebtn=document.querySelector("#mutebtn");
+    function handleMute(){
+        if(localstream.current){
+            let enable=localstream.current.getAudioTracks()[0].enabled;
+            if(enable){
+                localstream.current.getAudioTracks()[0].enabled=false;
+                mutebtn.innerHTML="unmute";
+            }
+            else{
+                localstream.current.getAudioTracks()[0].enabled=true;
+                mutebtn.innerHTML="Mute";
+            }
+        }
+    }
     function sendMessage(event){
 
         if(message){
@@ -298,17 +371,11 @@ function Lobby(){
     
     return (
         <div>
+            <div className="videos">
+                <button id="mutebtn" onclick={handleMute}>Mute</button>
+            </div>
             <div className="left_lobby">
                 <h3>word is {word}</h3>
-                {allusers.map((user)=>{
-                    return(
-                    <div>
-                        
-                        <p>user is {user.user} score is  {user.score}</p>
-                        
-                    </div>
-                    );
-                })}
                 <h3>Round number {round}</h3>
                 <h3>player {playername} is playing </h3>
             <p>{Cookies.get("userid")} {timer}</p>
@@ -349,7 +416,7 @@ function Lobby(){
         </div>
             {/* {console.log(admin)} */}
             {admin!=0?<button onClick={startGame}>Start</button>:null}
-            {/* <div ref={myMeeting} style={{height:"10px",width:"10px"}}></div> */}
+            <div ref={myMeeting}></div>
         </div>
     )
 }
