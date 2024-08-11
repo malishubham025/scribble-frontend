@@ -74,7 +74,7 @@ function Lobby(){
         let set=new Set();
         let peerId = null; 
         let remote=document.querySelector(".videos");
-        function addVideo(stream) {
+        function addVideo(stream,id) {
             // Check if the stream is already in the Set
             if (!set.has(stream)) {
               set.add(stream);
@@ -83,6 +83,7 @@ function Lobby(){
               let video = document.createElement("video");
               video.srcObject = stream;
               video.autoplay = true;
+              video.id = id;
               remote.appendChild(video);
               console.log(remote);
             }
@@ -93,7 +94,7 @@ function Lobby(){
         navigator.mediaDevices.getUserMedia({ audio: true, video: true })
         .then((stream) => {
           localstream.current=stream;
-          addVideo(stream);
+          addVideo(stream, "local"); 
         })
         .catch(err => console.error('Failed to get local stream', err));
       
@@ -108,27 +109,27 @@ function Lobby(){
                 socket.emit("join-room",{room,user});
                 peer.on('open',function(id){
                     peerId = id; 
-                    socket.emit("joinedroom",room,id);
+                    socket.emit("joinedroom",room,id,user);
                 })
                 
             }
             peer.on("call", async (call) => {
               call.answer(localstream.current); // Ensure localstream is available here
               call.on("stream", (remoteStream) => {
-                addVideo(remoteStream);
+                addVideo(remoteStream, call.peer);
               });
             });
           }
           
-          socket.on("userjoined",  (id) => {
+          socket.on("userjoined",  (id,user) => {
             
             let call =  peerinstance.current.call(id, localstream.current);
             // console.log(call);
             if(call){
                 console.log("hi");
-                            call.on("stream", (remoteStream) => {
-                console.log("called");
-              addVideo(remoteStream);
+                call.on("stream", (remoteStream) => {
+                console.log("called");  
+                addVideo(remoteStream, id);
             });
             }
 
@@ -138,6 +139,18 @@ function Lobby(){
         // io.on("game-started",(obj)=>{
             
         // })
+        function removeVideo(id) {
+            const video = document.getElementById(id);
+            if (video) {
+                video.srcObject.getTracks().forEach(track => track.stop()); // Stop the video tracks
+                video.remove(); // Remove the video element
+            }
+        }
+
+        socket.on("user-disconnect", id => {
+            console.log("user disconnected ",id);
+            removeVideo(id);
+        });
         socket.on("timer-player",(timebtwn)=>{
             setTimer(timebtwn);
         })
@@ -369,7 +382,7 @@ function Lobby(){
     return (
         <div>
             <div className="videos">
-                <button id="mutebtn" onclick={handleMute}>Mute</button>
+                <button id="mutebtn" onClick={handleMute}>Mute</button>
             </div>
             <div className="left_lobby">
                 <h3>word is {word}</h3>
