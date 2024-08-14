@@ -3,6 +3,8 @@ import {io} from "socket.io-client";
 import Cookies from "js-cookie";
 import { v4 as uuidv4 } from 'uuid';
 import Peer from "peerjs";
+import "./Audio.css"
+// import ScoresBoard from "./Socres";
 // import {ZegoUIKitPrebuilt} from "@zegocloud/zego-uikit-prebuilt"
 function Lobby(){
     var timebtwn=3;
@@ -13,6 +15,7 @@ function Lobby(){
     const [penColor, setPenColor] = React.useState("#000000"); 
     const [penWidth, setPenWidth] = React.useState(1);
     const [admin,setAdmin]=React.useState(0);
+    let [scores,setScores]=React.useState([{}]);
     const localstream=useRef(null);
     const peerinstance=useRef(null);
     function click(){
@@ -154,6 +157,7 @@ function Lobby(){
         socket.on("timer-player",(timebtwn)=>{
             setTimer(timebtwn);
         })
+
         socket.on("players-checked",(obj)=>{
            
             // if(admin===1){
@@ -259,6 +263,15 @@ function Lobby(){
             console.log(`player ${player} is playing `);
         })
         socket.on("round-end",({round})=>{
+            let d=0;
+            let user="x";
+            scores.map((data)=>{
+                if(data.score>d){
+                    user=data.user;
+                    d=data.score;
+                }
+            })
+            alert(`${user} is winner`)
             console.log(`round ${round} is ended `);
         });
         socket.on("word",(word)=>{
@@ -271,6 +284,18 @@ function Lobby(){
         })
         socket.on("reload",(room)=>{
             socket.emit("new_user",room);
+        })
+        socket.on("allusers",(map)=>{
+            console.log(map,typeof(map));
+            if(map){
+                setScores(map);
+                
+            }
+            console.log(scores);
+            // console.log(map);
+        })
+        socket.on("partial-start",(room)=>{
+            socket.emit("check-players",room);
         })
         // peer.on("close",()=>{
         //     let room=Cookies.get("roomid");
@@ -286,10 +311,12 @@ function Lobby(){
         if(localstream.current){
             let enable=localstream.current.getAudioTracks()[0].enabled;
             if(enable){
+                document.querySelector("#local").style.backgroundColor = "white";
                 localstream.current.getAudioTracks()[0].enabled=false;
                 mutebtn.innerHTML="unmute";
             }
             else{
+                document.querySelector("#local").style.backgroundColor = "green";
                 localstream.current.getAudioTracks()[0].enabled=true;
                 mutebtn.innerHTML="Mute";
             }
@@ -389,6 +416,14 @@ function Lobby(){
                 <h3>Round number {round}</h3>
                 <h3>player {playername} is playing </h3>
             <p>{Cookies.get("userid")} {timer}</p>
+            <div>
+                {scores && scores.length > 0 ? scores.map((data, index) => {
+                    return (
+                        <p key={index}>{data.user} {data.score}</p>
+                    );
+                }) : null}
+            </div>
+
             </div>
             <div className="right_lobby">
                 <form action="">

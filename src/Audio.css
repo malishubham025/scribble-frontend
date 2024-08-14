@@ -1,0 +1,10 @@
+.videos {
+    background-color: aqua !important;
+    display: flex;
+
+}
+
+.videos video{
+    height: 50px;
+    width: 50px;
+}
